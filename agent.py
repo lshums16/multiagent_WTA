@@ -12,20 +12,35 @@ class Agent:
         self.alt = agent_params["agent_spawn_alt"]
         self.max_psidot = agent_params["max_psidot"]
         self.max_glide_ratio = agent_params["max_glide_ratio"]
+        self.da = agent_params["num_attrition_sections"]
+        self.pa = agent_params["pa"]
+        self.collision_buffer = agent_params["collision_buffer"]
         
         self.Ts = Ts
-        self.kp_psi = 1. # TODO: tune
+        self.kp_psi = 3. # TODO: tune
         
         self.weapon_effectiveness = weapon_effectiveness
     
     def assign_target(self, target):
         self.target = target
-       
-    # # needs to be done every time-step 
-    # def update_attrition(self):
-    #     dij = np.linalg.norm(target.pos - seeker.pos) # this is 2D distance
-    #     d_int = dij/da # TODO: define da
-    #     self.attrition =  1 - (1 - self.pa)**d_int
+    
+    def decision(self, probability):
+        rand = np.random.random()
+        return rand < probability
+    
+    def check_collision(self):
+        if np.linalg.norm(self.target.pos - self.state[:2]) < self.collision_buffer:
+            return True, self.decision(self.weapon_effectiveness)
+        else:
+            return False, False
+    
+    def check_attrition(self):
+        dij = np.linalg.norm(self.target.pos - self.state[:2]) # this is 2D distance
+        d_int = dij/self.da 
+        self.attrition_prob =  1 - (1 - self.pa)**d_int
+        
+        return self.decision(self.attrition_prob)
+            
         
     def update_dynamics(self):
         target_pos = self.target.pos[:2]
