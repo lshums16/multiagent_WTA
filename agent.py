@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 class Agent:
     def __init__(self, id, pos, heading, agent_params, weapon_effectiveness, Ts):
@@ -20,6 +21,8 @@ class Agent:
         self.kp_psi = 3. # TODO: tune
         
         self.weapon_effectiveness = weapon_effectiveness
+        
+        self.prev_state = copy.copy(self.state)
     
     def assign_target(self, target):
         self.target = target
@@ -31,8 +34,29 @@ class Agent:
     def check_collision(self):
         if np.linalg.norm(self.target.pos - self.state[:2]) < self.collision_buffer:
             return True, self.decision(self.weapon_effectiveness)
-        else:
-            return False, False
+        
+        # check to see if agents collided between time steps
+        relative_speed = np.linalg.norm(np.zeros(2) - self.state[2]) # assumes target is stationary
+        check_buffer = relative_speed*self.Ts # this is the minimum distance the simulation at this time step is able to detect
+        
+        if np.linalg.norm(self.target.pos - self.state[:2]) < check_buffer*1.1: # if the distance between the two agents is less than the buffer (plus 50% cushion)
+            # import matplotlib.pyplot as plt
+            # plt.figure()
+            # plt.plot([self.prev_state[0], self.state[0]], [self.prev_state[1], self.state[1]])
+            # plt.scatter(self.target.pos[0], self.target.pos[1])
+            # plt.show(block=False)
+            
+            new_ts = int(relative_speed/self.collision_buffer) + 1
+            agent1_pos_list = np.linspace(self.prev_state[:2], self.state[:2], new_ts)
+            agent2_pos_list = np.array([self.target.pos for i in range(len(agent1_pos_list))]) # assumes stationary target
+            
+            distance = np.zeros(len(agent1_pos_list))
+            for i in range(new_ts):
+                distance[i] = np.linalg.norm(agent1_pos_list[i] - agent2_pos_list[i]) # only needed for plotting
+                if np.linalg.norm(agent1_pos_list[i] - agent2_pos_list[i]) < self.collision_buffer:
+                    return True, self.decision(self.weapon_effectiveness)
+        
+        return False, False
     
     def check_attrition(self):
         dij = np.linalg.norm(self.target.pos - self.state[:2]) # this is 2D distance

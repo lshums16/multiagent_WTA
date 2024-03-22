@@ -1,7 +1,4 @@
-# TODO: tune heading control (if needed)
 # TODO: tune attrition (da)?
-# TODO: advanced collision detection
-
 
 from agent import Agent
 from target import Target
@@ -18,17 +15,17 @@ agent_params = {"agent_spawn_alt": 500.,
                 "max_glide_ratio": 6.,
                 "num_attrition_sections": 100, # TODO: what should I set this as?
                 "pa": 0.00004,
-                "collision_buffer": 2.0
+                "collision_buffer": 5.0 # TODO: change?
                 } 
 
 round_ts = 1e-1
 dec_ts = 10e-6
 end_time = 100.0
 
-num_targets = 3
+num_targets = 10
 des_kill_prob = 0.7 # For now, this is for all targets. Some simulations may need to create it separately
 
-num_agents = 3
+num_agents = 10
 weapon_effectiveness = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
 
 # dictionaries containing agents/targets that have not been destroyed and update at every time step
@@ -55,7 +52,7 @@ for i in range(num_agents):
     
     agent.assign_target(active_targets[i]) # TODO: fix later, but for now, assign Agent 1 to Target 1
     
-    active_agents[f"{i}"] = agent
+    active_agents[i] = agent
     
 sim_time = 0
 plt_init = False
@@ -74,7 +71,7 @@ while sim_time < end_time:
                 print(f"[{sim_time:.2f}]: Target {agent.target.id} has been destroyed")
         
         elif agent.check_attrition():
-            
+            inactive_agents[id] = agent
             print(f"[{sim_time:.2f}]: Agent {id} has been attrited")
         
         agent_pos = agent.state[:2]
