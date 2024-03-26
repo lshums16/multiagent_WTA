@@ -24,7 +24,7 @@ class Belief:
             
     def update_kill_probabilities(self):
         for target_id in self.target_kill_prob:
-            seekers = [agent_est for agent_est in self.agent_estimates if self.agent_estimates[agent_est] == target_id] # get a list of agents who you belief are targeting the target
+            seekers = [self.agent_estimates[agent_est] for agent_est in self.agent_estimates if self.agent_estimates[agent_est]['assignment'] == target_id] # get a list of agents who you belief are targeting the target
             self.target_kill_prob[target_id] = self.calc_kill_prob(seekers)
             
     def update_agent_estimate(self, agent_id, target_id, attrition_prob, num_hops):

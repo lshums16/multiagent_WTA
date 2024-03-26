@@ -35,10 +35,9 @@ class Agent:
             return True
         return False
     
-    # TODO: def update_estimates(self):
+    def update_estimates(self):
+        self.belief.update_kill_probabilities()
         
-        
-    
     def is_reachable(self, target):
         v = self.state[2]
         zdot = v/np.linalg.norm(self.state[:2] - target.pos)*self.alt

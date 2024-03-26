@@ -111,14 +111,13 @@ while sim_time < end_time:
             print(f"[{sim_time:.2f}]: Agent {id} has collided with Target {agent.target.id}")
             if target_destroyed:
                 inactive_targets[agent.target.id] = agent.target
-                agent.target.des_kill_prob = 0 # set target's desired kill prob to zero (maybe not necessary since there is an "inactive_targets" dict)
                 print(f"[{sim_time:.2f}]: Target {agent.target.id} has been destroyed")
         
         elif agent.check_attrition():
             inactive_agents[id] = agent
             print(f"[{sim_time:.2f}]: Agent {id} has been attrited")
             
-        # TODO: agent.update_estimates()
+        agent.update_estimates()
         
         agent_pos = agent.state[:2]
         agent_heading = agent.state.item(3)
@@ -133,11 +132,23 @@ while sim_time < end_time:
     # remove any inactive agents from the active list
     for id in inactive_agents.keys():
         if id in active_agents:
+            
+            # Make all agents aware of destroyed target
+            for agent in active_agents.values():
+                del agent.belief.agent_estimates[id]
+
             del active_agents[id]
+               
     
     # remove any inactive agents from the activev list
     for id in inactive_targets.keys():
         if id in active_targets:
+            active_targets[id].des_kill_prob = 0 # set target's desired kill prob to zero (maybe not necessary since there is an "inactive_targets" dict)
+            
+            # Make all agents aware of destroyed target
+            for agent in active_agents.values():
+                del agent.belief.target_kill_prob[id]
+                
             del active_targets[id]
     
     
