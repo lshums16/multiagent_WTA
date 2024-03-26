@@ -36,7 +36,7 @@ class Agent:
         return False
     
     def update_estimates(self):
-        self.belief.update_kill_probabilities()
+        self.belief.target_kill_prob = self.calc_all_kill_probabilities(self.belief.target_kill_prob.keys(), self.belief.agent_estimates)
         
     def is_reachable(self, target):
         v = self.state[2]
@@ -142,5 +142,32 @@ class Agent:
         k3 = self.derivatives(self.state + self.Ts/2.*k2, *inputs)
         k4 = self.derivatives(self.state + self.Ts*k3, *inputs)
         self.state += self.Ts/6 * (k1 + 2*k2 + 2*k3 + k4)
+    
+    def calc_kill_prob(self, seekers):
+        product = 1
         
+        for agent in seekers: # seekers is a list of seekers targeting the current target
+            product *= (1 - agent["weapon_effectiveness"] + agent["weapon_effectiveness"]*agent["attrition_probability"])
+            
+        return 1 - product
+            
+    def calc_all_kill_probabilities(self, target_list, agent_estimates):
+        target_kill_prob = {}
+        for target_id in target_list:
+            seekers = [agent_estimates[agent_est] for agent_est in agent_estimates if agent_estimates[agent_est]['assignment'] == target_id] # get a list of agents who you belief are targeting the target
+            target_kill_prob[target_id] = self.calc_kill_prob(seekers)
         
+        return target_kill_prob
+    
+    def calc_cost_trad(self, agent_states, target_values):
+        cost = 0
+        target_kill_probabilities = {}
+        
+        for target_id in target_values:
+            target_kill_probabilities[target_id] = 0
+        target_kill_probabilities = self.belief.calc_all_kill_probabilities(target_values.keys(), agent_states)
+        
+        for target_id in target_kill_probabilities:
+            cost += (1 - target_kill_probabilities[target_id])*target_values[target_id]
+        
+        return cost
