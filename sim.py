@@ -1,13 +1,53 @@
+# TODO: have each agent calculate what it needs to after communication rounds are complete for a timestep
 # TODO: tune attrition (da)?
 
 from agent import Agent
 from target import Target
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
+
+def calc_EV(agents, targets):
+    exp_val = 0
+    for target in targets.values():
+        kill_prob = target.calc_kill_prob([agent for agent in agents.values() if hasattr(agent, "target") and agent.target.id == target.id])
+        exp_val += (1 - kill_prob)*target.value
+        
+    return exp_val
+
+# Assumes same comms range for all agents
+def update_adj_matrix(agents, comms_range):
+    n = len(agents)
+    A = np.identity(n)
+    for i in range(n):
+        for j in range(i, n):
+            if np.linalg.norm(agents[i].state[:2] - agents[j].state[:2]) <= comms_range:
+                A[i, j] = 1
+                A[j, i] = 1
+    
+    return A
+
+def communicate(A, agents):
+    for i in range(len(agents) - 1): # runs a communication round N - 1 times
+        # dist_matrix = floyd_warshall(A)
+        beliefs_dict = {}
+        for agent_id in agents:
+            beliefs_dict[agent_id] = copy.copy(agents[agent_id].belief)
+            
+        for agent1_id in agents:
+            for agent2_id in agents:
+                if agent1_id != agent2_id and A[agent1_id, agent2_id] != 0:
+                    agents[agent2_id].receive_belief(beliefs_dict[agent1_id])
+                    
+    for agent in agents.values():
+        agent.belief.reset_hops(agent.id) # this resets all hops (except agent's own) to infinity so that in the next round of communication, proper updates happen
+        
 
 target_spawn_dim = 750. # length (m) of the square within which the targets spawn randomly
 agent_spawn_dim = 750. # length (m) of the square within which the agents spawn randomly
-agent_target_spawn_dist = 2500. # distance (m) between agent spawn square and target spawn square
+agent_target_spawn_dist = 500. # distance (m) between agent spawn square and target spawn square
+
+comms_range = 600.
 
 agent_params = {"agent_spawn_alt": 500.,
                 "agent_velocity": 50.,
@@ -22,41 +62,45 @@ round_ts = 1e-1
 dec_ts = 10e-6
 end_time = 100.0
 
-num_targets = 10
+num_targets = 5
 des_kill_prob = 0.7 # For now, this is for all targets. Some simulations may need to create it separately
 
-num_agents = 10
-weapon_effectiveness = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
+num_agents = 5
+weapon_effectiveness_dict = {}
+for i in range(num_agents):
+    weapon_effectiveness_dict[i] = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
 
-# dictionaries containing agents/targets that have not been destroyed and update at every time step
-active_agents = {}
+
+# init targets   
 active_targets = {}
-
-# dictionaries containing agents/targets that have been destroyed
-inactive_agents = {}
-inactive_targets = {}
-
-# init targets    
 for i in range(num_targets):
     pos = np.array([np.random.uniform(high = target_spawn_dim), np.random.uniform(high = target_spawn_dim)])
-    
-    active_targets[i] = Target(i, pos, des_kill_prob)
+    active_targets[i] = Target(i, pos, des_kill_prob, value = 1) # TODO: value = des_kill_prob?
+
 
 # init agents and assign targets 
+active_agents = {}
 for i in range(num_agents):
     pos = np.array([np.random.uniform(high = agent_spawn_dim), np.random.uniform(high = agent_spawn_dim) + agent_target_spawn_dist])
     
     heading = np.random.uniform(low = -np.pi, high = np.pi)
     
-    agent = Agent(i, pos, heading, agent_params, weapon_effectiveness, round_ts)
+    agent = Agent(i, pos, heading, agent_params, weapon_effectiveness_dict, active_targets.keys(), round_ts) # assumes all agents have same effectiveness, but a different value can be put here if needed
     
     agent.assign_target(active_targets[i]) # TODO: fix later, but for now, assign Agent 1 to Target 1
     
     active_agents[i] = agent
-    
+
+
+
+inactive_targets = {} 
+inactive_agents = {}
+
 sim_time = 0
 plt_init = False
 while sim_time < end_time:
+    A = update_adj_matrix(active_agents, comms_range)
+    communicate(A, active_agents)
     sim_time += round_ts
     plt.clf()
     for id, agent in active_agents.items():
@@ -68,11 +112,14 @@ while sim_time < end_time:
             print(f"[{sim_time:.2f}]: Agent {id} has collided with Target {agent.target.id}")
             if target_destroyed:
                 inactive_targets[agent.target.id] = agent.target
+                agent.target.des_kill_prob = 0 # set target's desired kill prob to zero (maybe not necessary since there is an "inactive_targets" dict)
                 print(f"[{sim_time:.2f}]: Target {agent.target.id} has been destroyed")
         
         elif agent.check_attrition():
             inactive_agents[id] = agent
             print(f"[{sim_time:.2f}]: Agent {id} has been attrited")
+            
+        # TODO: agent.update_estimates()
         
         agent_pos = agent.state[:2]
         agent_heading = agent.state.item(3)
@@ -87,7 +134,7 @@ while sim_time < end_time:
     # remove any inactive agents from the active list
     for id in inactive_agents.keys():
         if id in active_agents:
-            del active_agents[id]
+            del activf_agents[id]
     
     # remove any inactive agents from the activev list
     for id in inactive_targets.keys():

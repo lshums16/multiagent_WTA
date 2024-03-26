@@ -1,8 +1,9 @@
 import numpy as np
 import copy
+from belief import Belief
 
 class Agent:
-    def __init__(self, id, pos, heading, agent_params, weapon_effectiveness, Ts):
+    def __init__(self, id, pos, heading, agent_params, weapon_effectiveness_dict, target_ids, Ts):
         # self.max_glide_ratio = 1.
         # self.weapon_effectiveness = 0.75 # TODO: may be on an agent-target basis
         # self.attrition = 0.75 # TODO: may be on an agent-target basis
@@ -20,16 +21,43 @@ class Agent:
         self.Ts = Ts
         self.kp_psi = 3. # TODO: tune
         
-        self.weapon_effectiveness = weapon_effectiveness
+        self.weapon_effectiveness = weapon_effectiveness_dict[id]
         
         self.prev_state = copy.copy(self.state)
-    
+        
+        self.belief = Belief(weapon_effectiveness_dict, target_ids)
+            
     def assign_target(self, target):
-        self.target = target
+        if self.is_reachable(target):
+            self.target = target
+            self.calc_attrition()
+            self.belief.update_agent_estimate(self.id, self.target.id, self.attrition_prob, num_hops = 0)
+            return True
+        return False
+    
+    # TODO: def update_estimates(self):
+        
+        
+    
+    def is_reachable(self, target):
+        v = self.state[2]
+        zdot = v/np.linalg.norm(self.state[:2] - target.pos)*self.alt
+
+        if abs(v/zdot) > self.max_glide_ratio:
+            return False
+        else:
+            return True
     
     def decision(self, probability):
         rand = np.random.random()
         return rand < probability
+    
+    def receive_belief(self, rec_belief):
+        for est_id, est_values in rec_belief.agent_estimates.items():
+            if est_values['num_hops'] + 1 < self.belief.agent_estimates[est_id]['num_hops']:
+                    self.belief.update_agent_estimate(est_id, est_values['assignment'], est_values['attrition_probability'], est_values['num_hops'] + 1)
+        print()
+
     
     def check_collision(self):
         if np.linalg.norm(self.target.pos - self.state[:2]) < self.collision_buffer:
@@ -58,11 +86,16 @@ class Agent:
         
         return False, False
     
-    def check_attrition(self):
+    def calc_attrition(self):
         dij = np.linalg.norm(self.target.pos - self.state[:2]) # this is 2D distance
         d_int = dij/self.da 
         self.attrition_prob =  1 - (1 - self.pa)**d_int
         
+        # update current estimate of self 
+        self.belief.update_agent_estimate(self.id, self.target.id, self.attrition_prob, num_hops = 0)
+    
+    def check_attrition(self):
+        self.calc_attrition()
         return self.decision(self.attrition_prob)
             
         
