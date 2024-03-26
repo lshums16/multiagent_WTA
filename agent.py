@@ -56,7 +56,6 @@ class Agent:
         for est_id, est_values in rec_belief.agent_estimates.items():
             if est_values['num_hops'] + 1 < self.belief.agent_estimates[est_id]['num_hops']:
                     self.belief.update_agent_estimate(est_id, est_values['assignment'], est_values['attrition_probability'], est_values['num_hops'] + 1)
-        print()
 
     
     def check_collision(self):

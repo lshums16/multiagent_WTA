@@ -16,11 +16,10 @@ def calc_EV(agents, targets):
     return exp_val
 
 # Assumes same comms range for all agents
-def update_adj_matrix(agents, comms_range):
-    n = len(agents)
+def update_adj_matrix(n, agents, comms_range):
     A = np.identity(n)
-    for i in range(n):
-        for j in range(i, n):
+    for i in agents:
+        for j in agents:
             if np.linalg.norm(agents[i].state[:2] - agents[j].state[:2]) <= comms_range:
                 A[i, j] = 1
                 A[j, i] = 1
@@ -99,7 +98,7 @@ inactive_agents = {}
 sim_time = 0
 plt_init = False
 while sim_time < end_time:
-    A = update_adj_matrix(active_agents, comms_range)
+    A = update_adj_matrix(num_agents, active_agents, comms_range)
     communicate(A, active_agents)
     sim_time += round_ts
     plt.clf()
