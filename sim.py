@@ -134,7 +134,7 @@ while sim_time < end_time:
     # remove any inactive agents from the active list
     for id in inactive_agents.keys():
         if id in active_agents:
-            del activf_agents[id]
+            del active_agents[id]
     
     # remove any inactive agents from the activev list
     for id in inactive_targets.keys():
