@@ -1,4 +1,4 @@
-# TODO: have each agent calculate what it needs to after communication rounds are complete for a timestep
+# TODO: check/debug (not bugs found yet) greedy function and traditional cost function
 # TODO: tune attrition (da)?
 
 from agent import Agent
@@ -40,11 +40,25 @@ def communicate(A, agents):
                     
     for agent in agents.values():
         agent.belief.reset_hops(agent.id) # this resets all hops (except agent's own) to infinity so that in the next round of communication, proper updates happen
-        
+
+# returns a list of agents ordered from highest to lowest weapon effectiveness
+def order_agents(agents):
+    agent_list = [agent for agent in agents.values()]
+    
+    # return list sorted in descending order by weapon effectiveness
+    agent_list.sort(reverse=True, key=lambda agent:agent.weapon_effectiveness) 
+    return agent_list
+
+def target_assignment(A, agents):
+    agent_list = order_agents(agents)
+    for i in range(len(agent_list)):
+        agent_list[i].select_target('greedy')
+        communicate(A, agents)
+        # TODO: call commmunicate here
 
 target_spawn_dim = 750. # length (m) of the square within which the targets spawn randomly
 agent_spawn_dim = 750. # length (m) of the square within which the agents spawn randomly
-agent_target_spawn_dist = 500. # distance (m) between agent spawn square and target spawn square
+agent_target_spawn_dist = 2500. # distance (m) between agent spawn square and target spawn square
 
 comms_range = 600.
 
@@ -64,7 +78,7 @@ end_time = 100.0
 num_targets = 5
 des_kill_prob = 0.7 # For now, this is for all targets. Some simulations may need to create it separately
 
-num_agents = 5
+num_agents = 10
 weapon_effectiveness_dict = {}
 for i in range(num_agents):
     weapon_effectiveness_dict[i] = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
@@ -74,7 +88,7 @@ for i in range(num_agents):
 active_targets = {}
 for i in range(num_targets):
     pos = np.array([np.random.uniform(high = target_spawn_dim), np.random.uniform(high = target_spawn_dim)])
-    active_targets[i] = Target(i, pos, des_kill_prob, value = 1) # TODO: value = des_kill_prob?
+    active_targets[i] = Target(i, pos, des_kill_prob, value = des_kill_prob) 
 
 
 # init agents and assign targets 
@@ -84,22 +98,21 @@ for i in range(num_agents):
     
     heading = np.random.uniform(low = -np.pi, high = np.pi)
     
-    agent = Agent(i, pos, heading, agent_params, weapon_effectiveness_dict, active_targets.keys(), round_ts) # assumes all agents have same effectiveness, but a different value can be put here if needed
-    
-    agent.assign_target(active_targets[i]) # TODO: fix later, but for now, assign Agent 1 to Target 1
+    agent = Agent(i, pos, heading, agent_params, weapon_effectiveness_dict, active_targets, round_ts) # assumes all agents have same effectiveness, but a different value can be put here if needed
     
     active_agents[i] = agent
 
-
+A = update_adj_matrix(num_agents, active_agents, comms_range)
+target_assignment(A, active_agents)
 
 inactive_targets = {} 
 inactive_agents = {}
 
 sim_time = 0
 plt_init = False
-while sim_time < end_time:
+while sim_time < end_time and len(active_targets) != 0:
     A = update_adj_matrix(num_agents, active_agents, comms_range)
-    communicate(A, active_agents)
+    target_assignment(A, active_agents)
     sim_time += round_ts
     plt.clf()
     for id, agent in active_agents.items():
@@ -126,7 +139,7 @@ while sim_time < end_time:
         plt.scatter(agent_pos.item(1), agent_pos.item(0), color = 'blue')
         
         # plot agent heading direction
-        line_len = 100.
+        line_len = 50.
         plt.plot([agent_pos.item(1), agent_pos.item(1) + line_len*np.sin(agent_heading)], [agent_pos.item(0), agent_pos.item(0) + line_len*np.cos(agent_heading)], color = 'green')
     
     # remove any inactive agents from the active list

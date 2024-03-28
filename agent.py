@@ -3,7 +3,7 @@ import copy
 from belief import Belief
 
 class Agent:
-    def __init__(self, id, pos, heading, agent_params, weapon_effectiveness_dict, target_ids, Ts):
+    def __init__(self, id, pos, heading, agent_params, weapon_effectiveness_dict, target_dict, Ts):
         # self.max_glide_ratio = 1.
         # self.weapon_effectiveness = 0.75 # TODO: may be on an agent-target basis
         # self.attrition = 0.75 # TODO: may be on an agent-target basis
@@ -25,12 +25,14 @@ class Agent:
         
         self.prev_state = copy.copy(self.state)
         
-        self.belief = Belief(weapon_effectiveness_dict, target_ids)
+        self.target_dict= target_dict
+        
+        self.belief = Belief(weapon_effectiveness_dict, target_dict.keys())
             
     def assign_target(self, target):
         if self.is_reachable(target):
             self.target = target
-            self.calc_attrition()
+            self.attrition_prob = self.calc_attrition(self.target)
             self.belief.update_agent_estimate(self.id, self.target.id, self.attrition_prob, num_hops = 0)
             return True
         return False
@@ -84,16 +86,16 @@ class Agent:
         
         return False, False
     
-    def calc_attrition(self):
-        dij = np.linalg.norm(self.target.pos - self.state[:2]) # this is 2D distance
+    def calc_attrition(self, target):
+        dij = np.linalg.norm(target.pos - self.state[:2]) # this is 2D distance
         d_int = dij/self.da 
-        self.attrition_prob =  1 - (1 - self.pa)**d_int
+        return  1 - (1 - self.pa)**d_int
         
         # update current estimate of self 
-        self.belief.update_agent_estimate(self.id, self.target.id, self.attrition_prob, num_hops = 0)
+        self.belief.update_agent_estimate(self.id, target.id, self.attrition_prob, num_hops = 0)
     
     def check_attrition(self):
-        self.calc_attrition()
+        self.attrition_prob = self.calc_attrition(self.target)
         return self.decision(self.attrition_prob)
             
         
@@ -159,15 +161,39 @@ class Agent:
         
         return target_kill_prob
     
-    def calc_cost_trad(self, agent_states, target_values):
+    def calc_cost_trad(self, agent_states):
         cost = 0
         target_kill_probabilities = {}
         
-        for target_id in target_values:
+        for target_id in self.target_dict:
             target_kill_probabilities[target_id] = 0
-        target_kill_probabilities = self.belief.calc_all_kill_probabilities(target_values.keys(), agent_states)
+        target_kill_probabilities = self.calc_all_kill_probabilities(self.target_dict.keys(), agent_states)
         
         for target_id in target_kill_probabilities:
-            cost += (1 - target_kill_probabilities[target_id])*target_values[target_id]
+            cost += (1 - target_kill_probabilities[target_id])*self.target_dict[target_id].value
         
         return cost
+    
+    def select_target(self, method = 'greedy', cost_function = 'traditional'):
+        if method == 'greedy':
+            self.select_target_greedy(cost_function)
+        else:
+            raise ValueError("Invalid select target method")
+        
+    def select_target_greedy(self, cost_function):
+        min_cost = np.inf
+        min_cost_assignment = ''
+        pot_agent_estimates = copy.copy(self.belief.agent_estimates)
+        for target_id in self.belief.target_kill_prob.keys():
+            if self.is_reachable(self.target_dict[target_id]):
+                pot_agent_estimates[self.id]['assignment'] = target_id
+                pot_agent_estimates[self.id]['attrition_probability'] = self.calc_attrition(self.target_dict[target_id])
+                if cost_function == 'traditional':
+                    cost = self.calc_cost_trad(pot_agent_estimates) # TODO: add other cost functions
+                    if cost < min_cost:
+                        min_cost = cost
+                        min_cost_assignment = target_id
+                else: 
+                    raise ValueError("Invalid cost function type specified")
+            
+        self.assign_target(self.target_dict[min_cost_assignment])
