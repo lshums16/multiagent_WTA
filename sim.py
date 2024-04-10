@@ -58,7 +58,7 @@ def target_assignment(A, agents):
 
 target_spawn_dim = 750. # length (m) of the square within which the targets spawn randomly
 agent_spawn_dim = 750. # length (m) of the square within which the agents spawn randomly
-agent_target_spawn_dist = 2500. # distance (m) between agent spawn square and target spawn square
+agent_target_spawn_dist = 250. # distance (m) between agent spawn square and target spawn square
 
 comms_range = 600.
 
@@ -75,10 +75,10 @@ round_ts = 1e-1
 dec_ts = 10e-6
 end_time = 100.0
 
-num_targets = 5
-des_kill_prob = 0.7 # For now, this is for all targets. Some simulations may need to create it separately
+num_targets = 2
+des_kill_prob = 0.01 # For now, this is for all targets. Some simulations may need to create it separately
 
-num_agents = 10
+num_agents = 2
 weapon_effectiveness_dict = {}
 for i in range(num_agents):
     weapon_effectiveness_dict[i] = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
@@ -88,7 +88,10 @@ for i in range(num_agents):
 active_targets = {}
 for i in range(num_targets):
     pos = np.array([np.random.uniform(high = target_spawn_dim), np.random.uniform(high = target_spawn_dim)])
-    active_targets[i] = Target(i, pos, des_kill_prob, value = des_kill_prob) 
+    if i == num_targets - 1:
+        active_targets[i] = Target(i, pos, 0.7, value = 0.7) 
+    else:
+        active_targets[i] = Target(i, pos, des_kill_prob, value = des_kill_prob) 
 
 
 # init agents and assign targets 
@@ -141,7 +144,9 @@ while sim_time < end_time and len(active_targets) != 0:
         # plot agent heading direction
         line_len = 50.
         plt.plot([agent_pos.item(1), agent_pos.item(1) + line_len*np.sin(agent_heading)], [agent_pos.item(0), agent_pos.item(0) + line_len*np.cos(agent_heading)], color = 'green')
-    
+        
+        # plot connection between agent and target
+        plt.plot([agent_pos.item(1), agent.target.pos.item(1)], [agent_pos.item(0), agent.target.pos.item(0)], color = 'c')
     # remove any inactive agents from the active list
     for id in inactive_agents.keys():
         if id in active_agents:
@@ -153,7 +158,7 @@ while sim_time < end_time and len(active_targets) != 0:
             del active_agents[id]
                
     
-    # remove any inactive agents from the activev list
+    # remove any inactive agents from the active list
     for id in inactive_targets.keys():
         if id in active_targets:
             active_targets[id].des_kill_prob = 0 # set target's desired kill prob to zero (maybe not necessary since there is an "inactive_targets" dict)
@@ -166,7 +171,10 @@ while sim_time < end_time and len(active_targets) != 0:
     
     
     for target in active_targets.values():
-        plt.scatter(target.pos.item(1), target.pos.item(0), color = 'red')
+        if target.id == num_targets - 1:
+            plt.scatter(target.pos.item(1), target.pos.item(0), color = 'orange')
+        else:
+            plt.scatter(target.pos.item(1), target.pos.item(0), color = 'red')
         
     plt.gca().set_aspect("equal")
     if not plt_init:

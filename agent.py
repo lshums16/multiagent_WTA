@@ -161,7 +161,7 @@ class Agent:
         
         return target_kill_prob
     
-    def calc_cost_trad(self, agent_states):
+    def calc_cost(self, agent_states, cost_function):
         cost = 0
         target_kill_probabilities = {}
         
@@ -169,12 +169,74 @@ class Agent:
             target_kill_probabilities[target_id] = 0
         target_kill_probabilities = self.calc_all_kill_probabilities(self.target_dict.keys(), agent_states)
         
-        for target_id in target_kill_probabilities:
-            cost += (1 - target_kill_probabilities[target_id])*self.target_dict[target_id].value
+        if cost_function == "traditional":
+            for target_id in target_kill_probabilities:
+                cost += (1 - target_kill_probabilities[target_id])*self.target_dict[target_id].value
+        elif cost_function == "sufficiency threshold":
+            alpha = 1
+            for target_id in target_kill_probabilities:
+                if target_kill_probabilities[target_id] > self.target_dict[target_id].des_kill_prob:
+                    cost += 0
+                else:
+                    cost += (self.target_dict[target_id].des_kill_prob - target_kill_probabilities[target_id])/(1 -  self.target_dict[target_id].des_kill_prob)**alpha
+        elif cost_function == "tiered":
+            tiers = {}
+            for target_id in target_kill_probabilities:
+                des_kill_prob = self.target_dict[target_id].des_kill_prob
+                if des_kill_prob in tiers:
+                    tiers[des_kill_prob].append(target_id)
+                else:
+                    tiers[des_kill_prob] = [target_id]
+            
+            for tier_val in tiers.keys(): # for each tier
+                highest_tier = True
+                for other_tier_val in tiers.keys(): 
+                    if tier_val != other_tier_val:  
+                        if other_tier_val > tier_val: # for all higher tiers
+                            highest_tier = False
+                            penalty_flag = False
+                            for higher_tier_id in tiers[other_tier_val]:
+                                if target_kill_probabilities[higher_tier_id] < self.target_dict[higher_tier_id].des_kill_prob:
+                                    penalty_flag = True
+                                    break
+                                
+                            tier_dict = {}
+                            for id in agent_states:
+                                if id in tiers[tier_val]:
+                                    tier_dict[id] = agent_states[id]    
+                                
+                            if penalty_flag:
+                                #calculate penalty 
+                                # max_cost = 0
+                                # pot_agent_states = copy.copy(tier_dict)
+                                # if not self.id in pot_agent_states:
+                                #     pot_agent_states[self.id] = agent_states[self.id]
+                                # for target_id in tier_dict:
+                                #     if self.is_reachable(self.target_dict[target_id]):
+                                #         pot_agent_states[self.id]['assignment'] = target_id
+                                #         pot_agent_states[self.id]['attrition_probability'] = self.calc_attrition(self.target_dict[target_id])
+                                #         cost_temp = self.calc_cost(pot_agent_states, 'sufficiency threshold') 
+                                #         if cost_temp > max_cost:
+                                #             max_cost = cost_temp
+                                
+                                penalty = 1000 #max_cost*1.5
+                                cost += penalty
+                            else:
+                                cost += self.calc_cost(tier_dict, "sufficiency threshold")
+                if highest_tier:
+                    tier_dict = {}
+                    for id in agent_states:
+                        if agent_states[id]['assignment'] in tiers[tier_val]:
+                            tier_dict[id] = agent_states[id]   
+                    
+                    cost += self.calc_cost(tier_dict, "sufficiency threshold")       
+        else: 
+            raise ValueError("Invalid cost function type specified")
+            
         
         return cost
     
-    def select_target(self, method = 'greedy', cost_function = 'traditional'):
+    def select_target(self, method = 'greedy', cost_function = 'tiered'):
         if method == 'greedy':
             self.select_target_greedy(cost_function)
         else:
@@ -183,17 +245,14 @@ class Agent:
     def select_target_greedy(self, cost_function):
         min_cost = np.inf
         min_cost_assignment = ''
-        pot_agent_estimates = copy.copy(self.belief.agent_estimates)
+        pot_agent_estimates = copy.deepcopy(self.belief.agent_estimates)
         for target_id in self.belief.target_kill_prob.keys():
             if self.is_reachable(self.target_dict[target_id]):
                 pot_agent_estimates[self.id]['assignment'] = target_id
                 pot_agent_estimates[self.id]['attrition_probability'] = self.calc_attrition(self.target_dict[target_id])
-                if cost_function == 'traditional':
-                    cost = self.calc_cost_trad(pot_agent_estimates) # TODO: add other cost functions
-                    if cost < min_cost:
-                        min_cost = cost
-                        min_cost_assignment = target_id
-                else: 
-                    raise ValueError("Invalid cost function type specified")
-            
+                cost = self.calc_cost(pot_agent_estimates, cost_function) 
+                if cost < min_cost:
+                    min_cost = cost
+                    min_cost_assignment = target_id
+                
         self.assign_target(self.target_dict[min_cost_assignment])
