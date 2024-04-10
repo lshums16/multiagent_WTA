@@ -75,10 +75,10 @@ round_ts = 1e-1
 dec_ts = 10e-6
 end_time = 100.0
 
-num_targets = 2
+num_targets = 10
 des_kill_prob = 0.01 # For now, this is for all targets. Some simulations may need to create it separately
 
-num_agents = 2
+num_agents = 9
 weapon_effectiveness_dict = {}
 for i in range(num_agents):
     weapon_effectiveness_dict[i] = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
@@ -89,7 +89,7 @@ active_targets = {}
 for i in range(num_targets):
     pos = np.array([np.random.uniform(high = target_spawn_dim), np.random.uniform(high = target_spawn_dim)])
     if i == num_targets - 1:
-        active_targets[i] = Target(i, pos, 0.7, value = 0.7) 
+        active_targets[i] = Target(i, pos, 0.99, value = 0.99) 
     else:
         active_targets[i] = Target(i, pos, des_kill_prob, value = des_kill_prob) 
 

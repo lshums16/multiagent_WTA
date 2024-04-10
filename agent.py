@@ -230,13 +230,32 @@ class Agent:
                             tier_dict[id] = agent_states[id]   
                     
                     cost += self.calc_cost(tier_dict, "sufficiency threshold")       
+        elif cost_function == "completion":
+            target_id = agent_states[self.id]['assignment']
+            des_kill_prob = self.target_dict[target_id].des_kill_prob
+            agent_states_copy = copy.deepcopy(agent_states)
+            agent_states_copy[self.id]['assignment'] = None
+            if self.belief.agent_estimates[self.id]['assignment'] is None: 
+                target_kill_prob_wo_self = self.calc_all_kill_probabilities(self.target_dict.keys(), agent_states_copy)
+                if target_kill_prob_wo_self[target_id] >= des_kill_prob:
+                    if self.belief.agent_estimates[self.id]['assignment'] == target_id:
+                        return 0
+                    else:
+                        return 1000
+            elif target_kill_probabilities[target_id] >= des_kill_prob:
+                if target_kill_probabilities[target_id] >= des_kill_prob:
+                    if self.belief.agent_estimates[self.id]['assignment'] == target_id:
+                        return 0
+                    else:
+                        return 1000
+            return (np.log(1 - des_kill_prob) - np.log(1 - target_kill_probabilities[target_id]))/np.log(1 - self.weapon_effectiveness + self.weapon_effectiveness*agent_states[self.id]['attrition_probability'])
         else: 
             raise ValueError("Invalid cost function type specified")
             
         
         return cost
     
-    def select_target(self, method = 'greedy', cost_function = 'tiered'):
+    def select_target(self, method = 'greedy', cost_function = 'completion'):
         if method == 'greedy':
             self.select_target_greedy(cost_function)
         else:
