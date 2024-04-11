@@ -56,9 +56,12 @@ def target_assignment(A, agents):
         communicate(A, agents)
         # TODO: call commmunicate here
 
+animate = True
+plot_kill_prob = True
+
 target_spawn_dim = 750. # length (m) of the square within which the targets spawn randomly
 agent_spawn_dim = 750. # length (m) of the square within which the agents spawn randomly
-agent_target_spawn_dist = 250. # distance (m) between agent spawn square and target spawn square
+agent_target_spawn_dist = 2500. # distance (m) between agent spawn square and target spawn square
 
 comms_range = 600.
 
@@ -75,23 +78,25 @@ round_ts = 1e-1
 dec_ts = 10e-6
 end_time = 100.0
 
-num_targets = 10
+num_targets = 3
 des_kill_prob = 0.01 # For now, this is for all targets. Some simulations may need to create it separately
 
 num_agents = 9
 weapon_effectiveness_dict = {}
 for i in range(num_agents):
-    weapon_effectiveness_dict[i] = 0.9 # For now, this is for all targets. Some simulations may need to create is separately
+    weapon_effectiveness_dict[i] = 0.5 # For now, this is for all agents. Some simulations may need to create is separately
 
 
 # init targets   
 active_targets = {}
 for i in range(num_targets):
     pos = np.array([np.random.uniform(high = target_spawn_dim), np.random.uniform(high = target_spawn_dim)])
-    if i == num_targets - 1:
-        active_targets[i] = Target(i, pos, 0.99, value = 0.99) 
+    if i < 1:
+        active_targets[i] = Target(i, pos, 0.9, value = 0.9) 
+    elif i < 2:
+        active_targets[i] = Target(i, pos, 0.8, value = 0.8)
     else:
-        active_targets[i] = Target(i, pos, des_kill_prob, value = des_kill_prob) 
+        active_targets[i] = Target(i, pos, 0.7, value = 0.7) 
 
 
 # init agents and assign targets 
@@ -112,12 +117,25 @@ inactive_targets = {}
 inactive_agents = {}
 
 sim_time = 0
-plt_init = False
+sim_time_hist = [sim_time]
+target_kill_probabilities_hist = {}
+for target_id in active_targets:
+    target_kill_probabilities_hist[target_id] = [0]
+
+if animate:
+    anim_plt_init = False
+    anim_fig, anim_ax = plt.subplots()
+if plot_kill_prob:
+    kill_fig, kill_ax = plt.subplots()
 while sim_time < end_time and len(active_targets) != 0:
     A = update_adj_matrix(num_agents, active_agents, comms_range)
     target_assignment(A, active_agents)
     sim_time += round_ts
-    plt.clf()
+    sim_time_hist.append(sim_time)
+    if animate:
+        anim_ax.cla()
+    if plot_kill_prob:
+        kill_ax.cla()
     for id, agent in active_agents.items():
         agent.update_dynamics()
         
@@ -138,15 +156,16 @@ while sim_time < end_time and len(active_targets) != 0:
         agent_pos = agent.state[:2]
         agent_heading = agent.state.item(3)
         
-        # plot agent position
-        plt.scatter(agent_pos.item(1), agent_pos.item(0), color = 'blue')
-        
-        # plot agent heading direction
-        line_len = 50.
-        plt.plot([agent_pos.item(1), agent_pos.item(1) + line_len*np.sin(agent_heading)], [agent_pos.item(0), agent_pos.item(0) + line_len*np.cos(agent_heading)], color = 'green')
-        
-        # plot connection between agent and target
-        plt.plot([agent_pos.item(1), agent.target.pos.item(1)], [agent_pos.item(0), agent.target.pos.item(0)], color = 'c')
+        if animate:
+            # plot agent position
+            anim_ax.scatter(agent_pos.item(1), agent_pos.item(0), color = 'blue')
+            
+            # plot agent heading direction
+            line_len = 50.
+            anim_ax.plot([agent_pos.item(1), agent_pos.item(1) + line_len*np.sin(agent_heading)], [agent_pos.item(0), agent_pos.item(0) + line_len*np.cos(agent_heading)], color = 'green')
+            
+            # plot connection between agent and target
+            anim_ax.plot([agent_pos.item(1), agent.target.pos.item(1)], [agent_pos.item(0), agent.target.pos.item(0)], color = 'c')
     # remove any inactive agents from the active list
     for id in inactive_agents.keys():
         if id in active_agents:
@@ -170,21 +189,45 @@ while sim_time < end_time and len(active_targets) != 0:
             del active_targets[id]
     
     
+    
+    
+    target_kill_probabilities = active_agents[list(active_agents.keys())[0]].belief.target_kill_prob
+    for target_id in target_kill_probabilities_hist:
+        if target_id in target_kill_probabilities:
+            target_kill_probabilities_hist[target_id].append(target_kill_probabilities[target_id])
     for target in active_targets.values():
-        if target.id == num_targets - 1:
-            plt.scatter(target.pos.item(1), target.pos.item(0), color = 'orange')
+        if animate:
+            if target.id < 1:
+                anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'red')
+            elif target.id < 2:
+                anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'orange')
+            else:
+                anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'yellow')
+    
+    if plot_kill_prob:
+        for target_id, kill_prob_hist in target_kill_probabilities_hist.items():    
+            if target_id < 1:
+                color = 'red'
+            elif target_id < 2:
+                color = 'orange'
+            else:
+                color = 'yellow'
+            
+            len_hist = len(kill_prob_hist)
+            kill_ax.plot(sim_time_hist[:len_hist], kill_prob_hist, color = color)
+            
+     
+    if animate:   
+        anim_ax.set_aspect("equal")
+        if not anim_plt_init:
+            xlim = anim_ax.get_xlim()
+            ylim = anim_ax.get_ylim()
+            anim_plt_init = True
         else:
-            plt.scatter(target.pos.item(1), target.pos.item(0), color = 'red')
+            anim_ax.set_xlim(xlim)
+            anim_ax.set_ylim(ylim)
         
-    plt.gca().set_aspect("equal")
-    if not plt_init:
-        xlim = plt.gca().get_xlim()
-        ylim = plt.gca().get_ylim()
-        plt_init = True
-    else:
-        plt.xlim(xlim)
-        plt.ylim(ylim)
+        anim_ax.text(xlim[1]*0.87, ylim[1]*1.02, f"t = {sim_time:.2f}s")    
     
-    plt.gca().text(xlim[1]*0.87, ylim[1]*1.02, f"t = {sim_time:.2f}s")    
-    
-    plt.pause(round_ts)
+    if animate or plot_kill_prob:
+        plt.pause(round_ts)
