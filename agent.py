@@ -255,7 +255,7 @@ class Agent:
         
         return cost
     
-    def select_target(self, method = 'greedy', cost_function = 'sufficiency threshold'):
+    def select_target(self, method = 'greedy', cost_function = 'completion'):
         if method == 'greedy':
             self.select_target_greedy(cost_function)
         else:

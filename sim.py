@@ -6,6 +6,8 @@ from target import Target
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+from matplotlib.colors import LinearSegmentedColormap
+import plotter
 
 def calc_EV(agents, targets):
     exp_val = 0
@@ -49,15 +51,17 @@ def order_agents(agents):
     agent_list.sort(reverse=True, key=lambda agent:agent.weapon_effectiveness) 
     return agent_list
 
-def target_assignment(A, agents):
+def target_assignment(A, agents, cost_function):
     agent_list = order_agents(agents)
     for i in range(len(agent_list)):
-        agent_list[i].select_target('greedy')
+        agent_list[i].select_target('greedy', cost_function)
         communicate(A, agents)
         # TODO: call commmunicate here
 
-animate = True
-plot_kill_prob = True
+cost_function = 'traditional'
+animate = False
+plot_kill_prob = False
+np.random.seed(9)
 
 target_spawn_dim = 750. # length (m) of the square within which the targets spawn randomly
 agent_spawn_dim = 750. # length (m) of the square within which the agents spawn randomly
@@ -78,22 +82,22 @@ round_ts = 1e-1
 dec_ts = 10e-6
 end_time = 100.0
 
-num_targets = 3
+num_targets = 6
 des_kill_prob = 0.01 # For now, this is for all targets. Some simulations may need to create it separately
 
-num_agents = 9
+num_agents = 8
 weapon_effectiveness_dict = {}
 for i in range(num_agents):
-    weapon_effectiveness_dict[i] = 0.5 # For now, this is for all agents. Some simulations may need to create is separately
+    weapon_effectiveness_dict[i] = 0.7 # For now, this is for all agents. Some simulations may need to create is separately
 
 
 # init targets   
 active_targets = {}
 for i in range(num_targets):
     pos = np.array([np.random.uniform(high = target_spawn_dim), np.random.uniform(high = target_spawn_dim)])
-    if i < 1:
+    if i < 2:
         active_targets[i] = Target(i, pos, 0.9, value = 0.9) 
-    elif i < 2:
+    elif i < 4:
         active_targets[i] = Target(i, pos, 0.8, value = 0.8)
     else:
         active_targets[i] = Target(i, pos, 0.7, value = 0.7) 
@@ -111,7 +115,7 @@ for i in range(num_agents):
     active_agents[i] = agent
 
 A = update_adj_matrix(num_agents, active_agents, comms_range)
-target_assignment(A, active_agents)
+target_assignment(A, active_agents, cost_function)
 
 inactive_targets = {} 
 inactive_agents = {}
@@ -119,8 +123,11 @@ inactive_agents = {}
 sim_time = 0
 sim_time_hist = [sim_time]
 target_kill_probabilities_hist = {}
+agent_assignment_hist = {}
 for target_id in active_targets:
     target_kill_probabilities_hist[target_id] = [0]
+for agent_id in active_agents:
+    agent_assignment_hist[agent_id] = [active_agents[agent_id].target.id]
 
 if animate:
     anim_plt_init = False
@@ -129,7 +136,7 @@ if plot_kill_prob:
     kill_fig, kill_ax = plt.subplots()
 while sim_time < end_time and len(active_targets) != 0:
     A = update_adj_matrix(num_agents, active_agents, comms_range)
-    target_assignment(A, active_agents)
+    target_assignment(A, active_agents, cost_function)
     sim_time += round_ts
     sim_time_hist.append(sim_time)
     if animate:
@@ -190,44 +197,54 @@ while sim_time < end_time and len(active_targets) != 0:
     
     
     
-    
-    target_kill_probabilities = active_agents[list(active_agents.keys())[0]].belief.target_kill_prob
-    for target_id in target_kill_probabilities_hist:
-        if target_id in target_kill_probabilities:
-            target_kill_probabilities_hist[target_id].append(target_kill_probabilities[target_id])
-    for target in active_targets.values():
-        if animate:
-            if target.id < 1:
-                anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'red')
-            elif target.id < 2:
-                anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'orange')
-            else:
-                anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'yellow')
-    
-    if plot_kill_prob:
-        for target_id, kill_prob_hist in target_kill_probabilities_hist.items():    
-            if target_id < 1:
-                color = 'red'
-            elif target_id < 2:
-                color = 'orange'
-            else:
-                color = 'yellow'
-            
-            len_hist = len(kill_prob_hist)
-            kill_ax.plot(sim_time_hist[:len_hist], kill_prob_hist, color = color)
-            
-     
-    if animate:   
-        anim_ax.set_aspect("equal")
-        if not anim_plt_init:
-            xlim = anim_ax.get_xlim()
-            ylim = anim_ax.get_ylim()
-            anim_plt_init = True
-        else:
-            anim_ax.set_xlim(xlim)
-            anim_ax.set_ylim(ylim)
+    if len(active_agents) > 0:
+        for agent_id in agent_assignment_hist:
+            if agent_id in active_agents:
+                agent_assignment_hist[agent_id].append(active_agents[agent_id].target.id)
         
-        anim_ax.text(xlim[1]*0.87, ylim[1]*1.02, f"t = {sim_time:.2f}s")    
-    
-    if animate or plot_kill_prob:
-        plt.pause(round_ts)
+        target_kill_probabilities = active_agents[list(active_agents.keys())[0]].belief.target_kill_prob
+        for target_id in target_kill_probabilities_hist:
+            if target_id in target_kill_probabilities:
+                target_kill_probabilities_hist[target_id].append(target_kill_probabilities[target_id])
+        for target in active_targets.values():
+            if animate:
+                if target.id < 2:
+                    anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'red')
+                elif target.id < 4:
+                    anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'orange')
+                else:
+                    anim_ax.scatter(target.pos.item(1), target.pos.item(0), color = 'yellow')
+        
+        if plot_kill_prob:
+            for target_id, kill_prob_hist in target_kill_probabilities_hist.items():    
+                if target_id < 2:
+                    color = 'red'
+                elif target_id < 4:
+                    color = 'orange'
+                else:
+                    color = 'yellow'
+                
+                len_hist = len(kill_prob_hist)
+                kill_ax.plot(sim_time_hist[:len_hist], kill_prob_hist, color = color)
+                
+        
+        if animate:   
+            anim_ax.set_aspect("equal")
+            if not anim_plt_init:
+                xlim = anim_ax.get_xlim()
+                ylim = anim_ax.get_ylim()
+                anim_plt_init = True
+            else:
+                anim_ax.set_xlim(xlim)
+                anim_ax.set_ylim(ylim)
+            
+            anim_ax.text(xlim[1]*0.87, ylim[1]*1.02, f"t = {sim_time:.2f}s")    
+        
+        if animate or plot_kill_prob:
+            plt.pause(round_ts)
+    else:
+        break
+
+plotter.plot_achieved_pk(target_kill_probabilities_hist, num_targets)
+
+plotter.plot_agent_assignments(agent_assignment_hist, num_agents, num_targets)
