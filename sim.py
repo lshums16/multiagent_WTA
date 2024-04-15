@@ -58,7 +58,7 @@ def target_assignment(A, agents, cost_function):
         communicate(A, agents)
         # TODO: call commmunicate here
 
-cost_function = 'traditional'
+cost_function = 'traditional' # which cost function to use ("traditional", "sufficiency threshold", "tiered", or "completion")
 animate = False
 plot_kill_prob = False
 np.random.seed(9)
