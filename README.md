@@ -13,19 +13,19 @@ Each cost function prioritizes targets in different ways in order to maximize th
 
 The following figures demonstrate examples of each cost function implemented in simulation. The orange dots represent weapons, and the multi-colored dots represent targets of different priority levels (blue being the highest and red being the lowest). The connecting lines between a weapon and target represent the current assignment.
 
-Traditional cost function:
+###Traditional cost function:
 
 ![screen reader text](trad.gif)
 
-Sufficiency Threshold cost function:
+###Sufficiency Threshold cost function:
 
 ![screen reader text](st.gif)
 
-Enforced Tiering cost function:
+###Enforced Tiering cost function:
 
 ![screen reader text](tiered.gif)
 
-Completion cost function:
+###Completion cost function:
 
 ![screen reader text](completion.gif)
 
